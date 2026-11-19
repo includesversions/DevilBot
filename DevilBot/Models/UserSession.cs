@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace DevilBot
+namespace DevilBot.Models
 {
     class UserSession
     {
