@@ -15,138 +15,91 @@ namespace DevilBot
     {
         public static ITelegramBotClient BotClient { get; set; }
         public static bool oneMovie;
-        public static bool addCaption;
+        public static bool addChannel;
         static Dictionary<long, UserSession> sessions = new();
         public static string? LastMoiveId = null;
-        public static ObservableCollection<Media> Movies = new();
-        public static ObservableCollection<ManyMedia> ManyMovies = new();
-        public static ManyMedia? currenctMedia = null;
+        public static ObservableCollection<string> Channel = new();
         public static int lastMessageId;
         static string apiUrl = "https://www.eporner.com/api/v2/video/search/?query=anal&per_page=100";
 
+        public static Dictionary<string, string> categoryKeys = new()
+        {
+           ["Amateur"] = "آماتور",
+           ["Anal"] = "مقعدی",
+           ["Solo"] = "تک نفره",
+           ["Couples"] = "کاسپلی",
+           ["Lesbian"] = "لزبین",
+           ["Gay"] = "گی",
+           ["MILF"] = "میلف",
+           ["Hentai"] = "هنتای",
+           ["POV"] = "موقعیت",
+           ["Romantic"] = "عاشقانه",
+           ["Hardcore"] = "سرسخت",
+           ["Mature"] = "بالغانه",
+           ["Couples"] = "کاپل",
+           ["ایرانی"] = "ایرانی",
+           ["Foot fetish"] = "فوت فتیش",
+           ["Footjob"] = "Footjob",
+           ["Handjob"] = "Handjob",
+           ["BDSM"] = "BDSM",
+ 
+           
+
+
+        };
+
         public static async Task Sender(Message message, UpdateType type)
         {
-            if (LastMoiveId != null)
+            var buttons = new List<InlineKeyboardButton[]>();
+
+            foreach (string channel in Channel)
             {
-                if (oneMovie)
+                var status = await BotClient.GetChatMember(channel, message!.From!.Id);
+
+                if (status.Status is ChatMemberStatus.Left or ChatMemberStatus.Kicked)
                 {
-                    try
+                    buttons.Add(new[]
                     {
-                        ref Media found = ref FindMedia(Movies.ToArray(), LastMoiveId);
-
-                        found.Description = message.Text;
-
-                        LastMoiveId = null;
-
-                        await BotClient.SendMessage(message.Chat.Id, $"*{found.Description}*\n\n[Watch now]({found.Link})", ParseMode.Markdown);
-
-                    }
-                    catch
-                    {
-                        LastMoiveId = null;
-                        throw;
-                    }
-                }
-                if(!oneMovie)
-                {
-                    try
-                    {
-                        if (addCaption)
-                        {
-                            if (currenctMedia != null)
-                            {
-                                ManyMovies.Add(currenctMedia);
-
-                                ref ManyMedia found = ref FindManyMedia(ManyMovies.ToArray(), LastMoiveId!);
-
-                                found?.Description = message?.Text ?? "";
-                                LastMoiveId = null;
-
-                                await BotClient.SendMessage(message.Chat.Id, $"*{found.Description}*\n\n[Watch now]({found.Link})", ParseMode.Markdown);
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        throw;
-                    }
-                }
-                
-                static ref ManyMedia FindManyMedia(Span<ManyMedia> people, string id)
-                {
-                    for (int i = 0; i < people.Length; i++)
-                    {
-                        if (people[i].Id.ToString() == id)
-                            return ref people[i];
-                    }
-
-                    throw new KeyNotFoundException();
-                }
-
-                static ref Media FindMedia(Span<Media> people, string id)
-                {
-                    for (int i = 0; i < people.Length; i++)
-                    {
-                        if (people[i].Id.ToString() == id)
-                            return ref people[i];
-                    }
-
-                    throw new KeyNotFoundException();
+            InlineKeyboardButton.WithUrl(
+                $"عضویت در {channel}",
+                $"https://t.me/{channel.TrimStart('@')}"
+            )
+        });
                 }
             }
-            
 
-            if (message?.Type == MessageType.Video && (message.Chat.Id == 2103359553 || message.Chat.Id == 6124324134))
+            buttons.Add(new[]
             {
-                if (oneMovie)
-                {
-                    Media media = Media.Add(message);
-                    if (!Movies.Any(n => n.FileId == media.FileId))
-                    {
-                        Movies.Add(media);
-                        LastMoiveId = media.Id.ToString();
-                        //var info = await BotClient.SendMessage(message.Chat.Id, "کپشن اضافه کنیم؟", replyMarkup: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("اره", "addCaption"), InlineKeyboardButton.WithCallbackData("نه", "addCaptionCancel") } }));
-                        //UpdateHandler.LastMessageId = info.MessageId;
-                    }
-                    else
-                        await BotClient.SendMessage(message.Chat.Id, "*ویدیو از قبل وجود داره*\nتکلیف چیه؟", replyMarkup: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("افزودن ویدیو", "add_video"), InlineKeyboardButton.WithCallbackData("افزودن کانال", "add_channel") } }));
-                  
-                }
+    InlineKeyboardButton.WithCallbackData("عضو شدم", "joined")
+});
 
-                if (lastMessageId == 0)
+            if (buttons.Count > 1)
+            {
+               var info =  await BotClient.SendMessage(
+                    message!.Chat.Id,
+                    "برای استفاده ابتدا در کانال‌های زیر عضو شوید:",
+                    replyMarkup: new InlineKeyboardMarkup(buttons)
+                );
+
+                lastMessageId = info.MessageId;
+
+                return;
+            }
+
+            if (addChannel)
+            {
+                if (message.Text.StartsWith("@"))
                 {
-                    var messageInfo = await BotClient.SendMessage(message.Chat.Id, "گرفتم حالا چه کنیم؟", replyMarkup: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("کپشن اضافه کنیم", "addCaption"), InlineKeyboardButton.WithCallbackData("منصرف شدم", "sendMovieCancel") } }));
-                    UpdateHandler.LastMessageId = messageInfo.MessageId;
-                    lastMessageId = messageInfo.MessageId;
-                    
+                    Channel.Add(message.Text);
+                    addChannel = false;
+                    await BotClient.SendMessage(message.Chat.Id, $"کانال {message.Text} با موفقیت ثبت شد");
                 }
                 else
                 {
-                    await BotClient.DeleteMessage(message.Chat.Id, lastMessageId);
-                    var Info = await BotClient.SendMessage(message.Chat.Id, "گرفتم حالا چه کنیم؟", replyMarkup: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("کپشن اضافه کنیم", "addCaption"), InlineKeyboardButton.WithCallbackData("منصرف شدم", "sendMovieCancel") } }));
-                    UpdateHandler.LastMessageId = Info.MessageId;
-                    lastMessageId = Info.MessageId;
+                    await BotClient.SendMessage(message.Chat.Id, "کانال باید با @ شروع شود");
                 }
-
-                if (currenctMedia == null)
-                {
-                    currenctMedia = new ManyMedia
-                    {
-                        Id = Guid.NewGuid(),
-                        FileId = new(),
-                    };
-                    currenctMedia.FileId.Add(message?.Video?.FileId ?? "");
-                    currenctMedia.Link = $"https://t.me/DevliUplader_bot?start={currenctMedia.Id}";
-                    LastMoiveId = currenctMedia.Id.ToString();
-                    return;
-                }
-
-                currenctMedia.FileId.Add(message?.Video?.FileId ?? "");
-
             }
-            else
-            {
-                UserSession userInfo;
+            UserSession userInfo;
 
                 lock (sessions)
                 {
@@ -176,147 +129,117 @@ namespace DevilBot
                         userInfo.Response = await RequestPop(userInfo.ApiUrl);
                         userInfo.IsInitialized = true;
                     }
-                  
-                    if (message.Text.Contains("/start "))
+                if (message.Text == "Next")
+                {
+                    await SendInfo(message, userInfo);
+                }
+                else if (text == "/admin" && (message.Chat.Id == 2103359553 || message.Chat.Id == 6124324134))
+                {
+                    InlineKeyboardMarkup inlineKeyboard = new(new[]
                     {
-                        var findMovie = Movies.Any(n => n.Id.ToString() == message.Text.Split(' ', 2)[1].ToString());//.FirstOrDefault();
-                        var findManyMovie = ManyMovies.Any(n => n.Id.ToString() == message.Text.Split(' ', 2)[1].ToString());//.FirstOrDefault();
-
-                        if (findMovie || findManyMovie)
-                        {
-
-                            var manyMovie = ManyMovies.Where(n => n.Id.ToString() == message.Text.Split(' ', 2)[1].ToString()).FirstOrDefault();
-                            var movie = Movies.Where(n => n.Id.ToString() == message.Text.Split(' ', 2)[1].ToString()).FirstOrDefault();
-
-                            if (manyMovie != null)
-                            {
-                                IAlbumInputMedia[] media = new IAlbumInputMedia[manyMovie.FileId.Count];
-                                media[0] = new InputMediaVideo(manyMovie.FileId[0]) { Caption = manyMovie.Description };
-
-                                for (int index = 1; index <= manyMovie.FileId.Count() - 1; index++)
-                                    media[index] = new InputMediaVideo(manyMovie.FileId[index]);
-
-                                await BotClient.SendMediaGroup(message.Chat.Id, media);
-                            }
-                            if (movie != null)
-                                await BotClient.SendVideo(message.Chat.Id, $"{movie.FileId}", $"{movie.Description}");
-
-                        }
-
-                    }
-                    if (message.Text == "Next")
-                    {
-                        await SendInfo(message, userInfo);
-                    }
-                    else if (text == "/admin" && (message.Chat.Id == 2103359553 || message.Chat.Id == 6124324134))
-                    {
-                        InlineKeyboardMarkup inlineKeyboard = new(new[]
-                        {
                     new[]
                     {
                         InlineKeyboardButton.WithCallbackData("افزودن کانال", "add_channel"),
-                        InlineKeyboardButton.WithCallbackData("افزودن ویدیو", "add_video"),
+                        //InlineKeyboardButton.WithCallbackData("افزودن ویدیو", "add_video"),
                     }
                 });
 
-                        var info = await BotClient.SendMessage(message.Chat.Id, "چطوری عشق, در خدمتتم", replyMarkup: inlineKeyboard);
-                        UpdateHandler.LastMessageId = info.MessageId;
-                    }
-                    else if (message.Text == "Category")
-                    {
-                        await SendCategory(message);
-                    }
-                    else if (message.Text?.ToLower() == "/start")
-                    {
-                        await BotClient.SendMessage(
-                            message.Chat.Id,
-                            "Hey there, choose an option",
-                            replyMarkup: new KeyboardButton[]
-                            {
+                    var info = await BotClient.SendMessage(message.Chat.Id, "چطوری عشق, در خدمتتم", replyMarkup: inlineKeyboard);
+                    UpdateHandler.LastMessageId = info.MessageId;
+                }
+                else if (message.Text == "Category")
+                {
+                    await SendCategory(message);
+                }
+                else if (message.Text?.ToLower() == "/start")
+                {
+                    await BotClient.SendMessage(
+                        message.Chat.Id,
+                        "Hey there, choose an option",
+                        replyMarkup: new KeyboardButton[]
+                        {
                     new() { Text = "Category", Style = KeyboardButtonStyle.Primary },
                     new() { Text = "Next", Style = KeyboardButtonStyle.Success }
-                            });
-                    }
-                    else
+                        });
+                }
+                else
+                {
+                    var value = categoryKeys.Where(n => n.Value == message.Text).FirstOrDefault();
+                    if (value.Value == message.Text)
                     {
-                        if (!addCaption)
-                        {
-                            SelectCategory(message.Text ?? "", 500, userInfo);
+                        SelectCategory(value.Key ?? "", 500, userInfo);
 
-                            await BotClient.SendMessage(
-                               message.Chat.Id,
-                               $"New Target: {message.Text}.\n choose an option",
-                               replyMarkup: new KeyboardButton[]
-                               {
+                        await BotClient.SendMessage(
+                           message.Chat.Id,
+                           $"New Target: {message.Text}.\n choose an option",
+                           replyMarkup: new KeyboardButton[]
+                           {
                     new() { Text = "Next", Style = KeyboardButtonStyle.Success },
                     new() { Text = "Category", Style = KeyboardButtonStyle.Primary }
-                               });
+                           });
 
-                            userInfo.Response = await RequestPop(userInfo.ApiUrl);
+                        userInfo.Response = await RequestPop(userInfo.ApiUrl);
 
-                            userInfo.StepNumber = 0;
-                        }
-
+                        userInfo.StepNumber = 0;
                     }
+                }
+
                 }
                 finally
                 {
                     userInfo.Semaphore.Release();
                 }
             }
-        }
-
         private static async Task SendCategory(Message message)
         {
             ReplyKeyboardMarkup targetButtons = new(new[]
             {
         new KeyboardButton[]
         {
-            new KeyboardButton() { Text = "Amateur" },
-            new KeyboardButton() { Text = "Anal" },
-            new KeyboardButton() { Text = "Solo" }
+            new KeyboardButton() { Text = "ایرانی" },
+            new KeyboardButton() { Text = "Next", Style = KeyboardButtonStyle.Success },
         },
         new KeyboardButton[]
         {
-            new KeyboardButton() { Text = "Couples" },
-            new KeyboardButton() { Text = "Lesbian" },
-            new KeyboardButton() { Text = "Gay" }
+            new KeyboardButton() { Text = "آماتور" },
+            new KeyboardButton() { Text = "مقعدی" },
+            new KeyboardButton() { Text = "تک نفره" }
+        },
+        new KeyboardButton[]
+        {
+            new KeyboardButton() { Text = "کاپل" },
+            new KeyboardButton() { Text = "لزبین" },
+            new KeyboardButton() { Text = "گی" }
+        },
+        new KeyboardButton[]
+        {
+            new KeyboardButton() { Text = "فضای باز" },
+            new KeyboardButton() { Text = "عاشقانه" },
+            new KeyboardButton() { Text = "کاسپلی" }
+        },
+        new KeyboardButton[]
+        {
+            new KeyboardButton() { Text = "هارد کور" },
+            new KeyboardButton() { Text = "سافت کور" },
+            new KeyboardButton() { Text = "میلف" }
+        },
+        new KeyboardButton[]
+        {
+            new KeyboardButton() { Text = "بالغانه" },
+            new KeyboardButton() { Text = "هنتای" },
+            new KeyboardButton() { Text = "موقعیت" }
+        },
+
+        new KeyboardButton[]
+        {
+            new KeyboardButton() { Text = "فوت فتیش" },
+            new KeyboardButton() { Text = "Footjob" },
+            new KeyboardButton() { Text = "Handjob" }
         },
         new KeyboardButton[]
         {
             new KeyboardButton() { Text = "BDSM" },
-            new KeyboardButton() { Text = "Roleplay" },
-            new KeyboardButton() { Text = "Cosplay" }
         },
-        new KeyboardButton[]
-        {
-            new KeyboardButton() { Text = "Fetish" },
-            new KeyboardButton() { Text = "Foot fetish" },
-            new KeyboardButton() { Text = "MILF" }
-        },
-        new KeyboardButton[]
-        {
-            new KeyboardButton() { Text = "Mature" },
-            new KeyboardButton() { Text = "Hentai" },
-            new KeyboardButton() { Text = "POV" }
-        },
-        new KeyboardButton[]
-        {
-            new KeyboardButton() { Text = "Outdoor" },
-            new KeyboardButton() { Text = "Romantic" },
-            new KeyboardButton() { Text = "Compilation" }
-        },
-        new KeyboardButton[]
-        {
-            new KeyboardButton() { Text = "Hardcore" },
-            new KeyboardButton() { Text = "Softcore" },
-            new KeyboardButton() { Text = "Interracial" }
-        },
-        new KeyboardButton[]
-        {
-            new KeyboardButton() { Text = "Footjob" },
-            new KeyboardButton() { Text = "Handjob" }
-        }
     })
             {
                 ResizeKeyboard = true
@@ -383,6 +306,8 @@ namespace DevilBot
        private static void ChangeUrl(string query, int count, UserSession session)
         {
             session.ApiUrl = $"https://www.eporner.com/api/v2/video/search/?query={Uri.EscapeDataString(query)}&per_page={count}";
+
+
         }
 
         private static void SelectCategory(string category, int count, UserSession session)
@@ -396,28 +321,23 @@ namespace DevilBot
                 "Lesbian" => () => ChangeUrl(category.ToLower(), count, session),
                 "Gay" => () => ChangeUrl(category.ToLower(), count, session),
                 "BDSM" => () => ChangeUrl(category.ToLower(), count, session),
-                "Roleplay" => () => ChangeUrl(category.ToLower(), count, session),
                 "Cosplay" => () => ChangeUrl(category.ToLower(), count, session),
-                "Fetish" => () => ChangeUrl(category.ToLower(), count, session),
+                "Softcore" => () => ChangeUrl(category.ToLower(), count, session),
+                "POV" => () => ChangeUrl(category.ToLower(), count, session),
+                "Romantic" => () => ChangeUrl(category.ToLower(), count, session),
                 "Foot fetish" => () => ChangeUrl(category.ToLower(), count, session),
                 "MILF" => () => ChangeUrl(category.ToLower(), count, session),
                 "Mature" => () => ChangeUrl(category.ToLower(), count, session),
                 "Hentai" => () => ChangeUrl(category.ToLower(), count, session),
-                "POV" => () => ChangeUrl(category.ToLower(), count, session),
-                "Outdoor" => () => ChangeUrl(category.ToLower(), count, session),
-                "Romantic" => () => ChangeUrl(category.ToLower(), count, session),
-                "Compilation" => () => ChangeUrl(category.ToLower(), count, session),
                 "Hardcore" => () => ChangeUrl(category.ToLower(), count, session),
-                "Softcore" => () => ChangeUrl(category.ToLower(), count, session),
-                "Interracial" => () => ChangeUrl(category.ToLower(), count, session),
                 "Footjob" => () => ChangeUrl(category.ToLower(), count, session),
                 "Handjob" => () => ChangeUrl(category.ToLower(), count, session),
-                _ => () => { }
+                "ایرانی" => () => ChangeUrl(category.ToLower(), count, session),
+                _ => () => ChangeUrl(category.ToLower(), count, session),
             };
 
             change();
+
         }
-
-
     }
 }

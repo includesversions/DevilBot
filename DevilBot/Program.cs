@@ -22,6 +22,7 @@ bot.OnUpdate += UpdateHandler.OnUpdate;
 bot.OnMessage += SenderHandler.Sender;
 
 Console.WriteLine("bot runing.");
+await bot.SendMessage(6124324134, "دوباره اجرا شدم برو لینک چنل رو تنظیم کن");
 
 Console.ReadLine();
 

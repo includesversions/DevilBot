@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Channels;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -13,62 +14,59 @@ namespace DevilBot
     {
         public static ITelegramBotClient? BotClient;
         public static int LastMessageId;
-        static long? userId;
+        static long userId;
         public static async Task OnUpdate(Update update)
         {
-            var data = update.CallbackQuery?.Data;
-            userId = update.CallbackQuery?.From.Id;
-
-            if (data == "add_channel")
+            try
             {
-                
+                var data = update.CallbackQuery?.Data;
+                userId = update.CallbackQuery?.From.Id ?? 0;
+
+                if (data == "add_channel")
+                {
+                    SenderHandler.addChannel = true;
+                    await BotClient!.EditMessageText(userId!, LastMessageId!, "لینکو بفرست به صورت زیر:\n@examplexxx");
+
+                }
+                if (data == "joined")
+                {
+                    var buttons = new List<InlineKeyboardButton[]>();
+
+                    foreach (string channel in SenderHandler.Channel)
+                    {
+                        var status = await BotClient.GetChatMember(channel, userId);
+
+                        if (status.Status is ChatMemberStatus.Left or ChatMemberStatus.Kicked)
+                        {
+                            buttons.Add(new[]
+                            {
+            InlineKeyboardButton.WithUrl(
+                $"عضویت در {channel}",
+                $"https://t.me/{channel.TrimStart('@')}"
+            )
+        });
+                        }
+                    }
+
+                    buttons.Add(new[] { InlineKeyboardButton.WithCallbackData("عضو شدم", "joined") });
+
+                    if (buttons.Count > 1)
+                    {
+                        await BotClient.AnswerCallbackQuery(
+                            update.CallbackQuery.Id,
+                            "تو کانال نمیبینمت"
+                        );
+
+                        return;
+                    }
+
+                    
+                    await BotClient!.SendMessage(userId!, "خوش اومدی عشق استفاده کن لذت ببر منو در اختیارته اگه نیاز به راهنمایی داری /help روش بزن بهت بگم چیکار کنی", replyMarkup: new KeyboardButton[] { new() { Text = "Category", Style = KeyboardButtonStyle.Primary }, new() { Text = "Next", Style = KeyboardButtonStyle.Success } });
+                    
+                }
             }
-            else if(data == "add_video")
-            {
-                await BotClient!.EditMessageText(userId!, LastMessageId!, "خب مشخص کن چند تا ویدیو میخوای اضافه کنی", replyMarkup: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("یکی", "oneMovie"), InlineKeyboardButton.WithCallbackData("چند تا", "manyMovie") }, new[] { InlineKeyboardButton.WithCallbackData("نظرم عوض شد, دیگه نمیخوام", "sendMovieCancel") } } ));
-
-            }
-
-            if(data is not null)
-                CheckCallbackData(data);
-
-
-            if (data == "addCaption")
-            {
-                SenderHandler.addCaption = true;
-                await BotClient!.EditMessageText(userId!, LastMessageId!, "بفرست");
-
-            }
-
-
-        }
-
-        private static void CheckCallbackData(string data)
-        {
-            Action run = data switch
-            {
-                "oneMovie" => OneMovieIntro, 
-                "manyMovie" => ManyMovieIntro,
-                _ => () => { }
-            };
-
-            run();
-        }
-
-        private static async void OneMovieIntro()
-        {
-            SenderHandler.oneMovie = true;
-            await BotClient!.EditMessageText(userId!, LastMessageId!, "بفرستش");
-        }
-        private static async void ManyMovieIntro()
-        {
-            SenderHandler.oneMovie = false;
-            await BotClient!.EditMessageText(userId!, LastMessageId!, "یکی یکی برام ارسال کن یا فور بزن");
-        }
-
-        private static async void OneMovieHandler()
-        {
-            
+            catch
+            { throw; }
         }
         
     }
