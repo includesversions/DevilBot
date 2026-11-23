@@ -1,18 +1,8 @@
 ﻿using System;
-using System.Text;
 using DevilBot;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Net.Http;
 using Telegram.Bot;
-using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
-using Newtonsoft.Json;
-using Telegram.Bot.Types.ReplyMarkups;
-using System.Collections.ObjectModel;
 
-TelegramBotClient bot = new("9292779843:AAFrYCURT5IsT0NqHAM0WgpjqaRdOifoiZM");
+TelegramBotClient bot = new("9013422708:AAHVjsjBQ1WadzQ2d6Domq1Kn46_fCXBjyo");
 
 UpdateHandler.BotClient = bot;
 SenderHandler.BotClient = bot;
@@ -21,8 +11,9 @@ bot.OnUpdate += UpdateHandler.OnUpdate;
 
 bot.OnMessage += SenderHandler.Sender;
 
-Console.WriteLine("bot runing.");
-await bot.SendMessage(6124324134, "دوباره اجرا شدم برو لینک چنل رو تنظیم کن");
+Console.WriteLine("Bot Running.");
+
+await bot.SendMessage(6124324134, "دوباره اجرا شدم");
 
 Console.ReadLine();
 

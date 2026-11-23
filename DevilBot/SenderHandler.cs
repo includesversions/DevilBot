@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -17,8 +18,10 @@ namespace DevilBot
         public static bool oneMovie;
         public static bool addChannel;
         static Dictionary<long, UserSession> sessions = new();
+        public static List<UserInfo> Users = new();
+
         public static string? LastMoiveId = null;
-        public static ObservableCollection<string> Channel = new();
+        public static ObservableCollection<string> Channel = new() { "@global_currency_iran" };
         public static int lastMessageId;
         static string apiUrl = "https://www.eporner.com/api/v2/video/search/?query=anal&per_page=100";
 
@@ -27,14 +30,15 @@ namespace DevilBot
            ["Amateur"] = "آماتور",
            ["Anal"] = "مقعدی",
            ["Solo"] = "تک نفره",
-           ["Couples"] = "کاسپلی",
+           ["Cosplay"] = "کاسپلی",
            ["Lesbian"] = "لزبین",
-           ["Gay"] = "گی",
+           ["Outdoor"] = "فضای باز",
            ["MILF"] = "میلف",
            ["Hentai"] = "هنتای",
            ["POV"] = "موقعیت",
            ["Romantic"] = "عاشقانه",
-           ["Hardcore"] = "سرسخت",
+           ["Hardcore"] = "هارد کور",
+           ["Softcore"] = "سافت کور",
            ["Mature"] = "بالغانه",
            ["Couples"] = "کاپل",
            ["ایرانی"] = "ایرانی",
@@ -42,14 +46,26 @@ namespace DevilBot
            ["Footjob"] = "Footjob",
            ["Handjob"] = "Handjob",
            ["BDSM"] = "BDSM",
- 
-           
-
-
         };
 
         public static async Task Sender(Message message, UpdateType type)
         {
+            long chatId = message.Chat.Id;
+            if(UpdateHandler.SendUsers && (chatId == 6124324134) || chatId == 2103359553)
+            {
+                if (message.Text is null) return;
+                var info = await BotClient.SendMessage(message.Chat.Id, "درحال ارسال پیام");
+                foreach (UserSession users in sessions.Values)
+                {
+                    if (users.ChatId == message.Chat.Id) continue;
+                    await BotClient.SendMessage(users.ChatId, message.Text, ParseMode.Markdown);
+                }
+                await BotClient!.EditMessageText(message.Chat?.Id, info.MessageId, "پیام با موفقیت ارسال شد.");
+
+                UpdateHandler.SendUsers = false;
+                return;
+            }
+
             var buttons = new List<InlineKeyboardButton[]>();
 
             foreach (string channel in Channel)
@@ -77,7 +93,7 @@ namespace DevilBot
             {
                var info =  await BotClient.SendMessage(
                     message!.Chat.Id,
-                    "برای استفاده ابتدا در کانال‌های زیر عضو شوید:",
+                    "درود برای استفاده ابتدا در کانال‌های زیر عضو شوید:",
                     replyMarkup: new InlineKeyboardMarkup(buttons)
                 );
 
@@ -111,12 +127,16 @@ namespace DevilBot
                             StepNumber = 0,
                             Cts = new(),
                             Response = new(),
-                            Semaphore = new(1, 1)
+                            Semaphore = new(1, 1),
+                            ChatId = message.Chat.Id,
+                            FirstName = message.From?.FirstName,
+                            UserName = message.From?.Username
                         };
 
                         sessions.Add(message.Chat.Id, userInfo);
-                    }
+                        Users.Add(new() { ChatId = message.Chat.Id, FirstName = message.From?.FirstName, UserName = $"https://t.me/{message.From?.Username}" });
                 }
+            }
 
                 await userInfo.Semaphore.WaitAsync();
 
@@ -129,7 +149,7 @@ namespace DevilBot
                         userInfo.Response = await RequestPop(userInfo.ApiUrl);
                         userInfo.IsInitialized = true;
                     }
-                if (message.Text == "Next")
+                if (message.Text == "بعدی")
                 {
                     await SendInfo(message, userInfo);
                 }
@@ -137,29 +157,29 @@ namespace DevilBot
                 {
                     InlineKeyboardMarkup inlineKeyboard = new(new[]
                     {
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData("افزودن کانال", "add_channel"),
-                        //InlineKeyboardButton.WithCallbackData("افزودن ویدیو", "add_video"),
-                    }
-                });
+                   new[] { InlineKeyboardButton.WithCallbackData("افزودن کانال", "add_channel") },
+                   new[] {  InlineKeyboardButton.WithCallbackData("مشاهده تعداد کل کاربران", "show_users") },
+                   new[] {  InlineKeyboardButton.WithCallbackData("ارسال پیام به تمامی کاربران", "sendmessage_allusers")},    
+                    });
+                    
 
                     var info = await BotClient.SendMessage(message.Chat.Id, "چطوری عشق, در خدمتتم", replyMarkup: inlineKeyboard);
                     UpdateHandler.LastMessageId = info.MessageId;
+
                 }
-                else if (message.Text == "Category")
+                else if (message.Text == "دسته بندی ها")
                 {
-                    await SendCategory(message);
+                    await SendCategory(message, null);
                 }
                 else if (message.Text?.ToLower() == "/start")
                 {
                     await BotClient.SendMessage(
                         message.Chat.Id,
-                        "Hey there, choose an option",
+                        "درود \r\nیکی از گزینه های زیر رو انتخاب کن",
                         replyMarkup: new KeyboardButton[]
                         {
-                    new() { Text = "Category", Style = KeyboardButtonStyle.Primary },
-                    new() { Text = "Next", Style = KeyboardButtonStyle.Success }
+                    new() { Text = "دسته بندی ها", Style = KeyboardButtonStyle.Primary },
+                    new() { Text = "بعدی", Style = KeyboardButtonStyle.Success }
                         });
                 }
                 else
@@ -167,20 +187,33 @@ namespace DevilBot
                     var value = categoryKeys.Where(n => n.Value == message.Text).FirstOrDefault();
                     if (value.Value == message.Text)
                     {
+                        await BotClient.SendMessageDraft(
+                            chatId: message.Chat.Id,
+                            draftId: 10111,
+                            text: "درحال جستوجو "
+                        );
+
+                        await Task.Delay(500);
+
                         SelectCategory(value.Key ?? "", 500, userInfo);
 
-                        await BotClient.SendMessage(
-                           message.Chat.Id,
-                           $"New Target: {message.Text}.\n choose an option",
-                           replyMarkup: new KeyboardButton[]
-                           {
-                    new() { Text = "Next", Style = KeyboardButtonStyle.Success },
-                    new() { Text = "Category", Style = KeyboardButtonStyle.Primary }
-                           });
+                        if (userInfo.ApiUrl is null)
+                        {
+                            await SendCategory(message, "موردی یافت نشد لطفا از دسته بندی های تهیه شده استفاده کنید"); 
+                            return;
+                        }
 
                         userInfo.Response = await RequestPop(userInfo.ApiUrl);
-
                         userInfo.StepNumber = 0;
+                       
+                        await BotClient.SendMessage(
+                           message.Chat.Id,
+                           $"دسته بندی {message.Text} تایید شد گزینه بعدی رو بزنید \r\nتا به یک بایگانی بی نهایت از فیلم ها وصل شید.",
+                           replyMarkup: new KeyboardButton[]
+                           {
+                    new() { Text = "بعدی", Style = KeyboardButtonStyle.Success },
+                    new() { Text = "دسته بندی ها", Style = KeyboardButtonStyle.Primary }
+                           });
                     }
                 }
 
@@ -190,14 +223,14 @@ namespace DevilBot
                     userInfo.Semaphore.Release();
                 }
             }
-        private static async Task SendCategory(Message message)
+        private static async Task SendCategory(Message message, string? txtMessage)
         {
             ReplyKeyboardMarkup targetButtons = new(new[]
             {
         new KeyboardButton[]
         {
             new KeyboardButton() { Text = "ایرانی" },
-            new KeyboardButton() { Text = "Next", Style = KeyboardButtonStyle.Success },
+            new KeyboardButton() { Text = "بعدی", Style = KeyboardButtonStyle.Success },
         },
         new KeyboardButton[]
         {
@@ -209,35 +242,32 @@ namespace DevilBot
         {
             new KeyboardButton() { Text = "کاپل" },
             new KeyboardButton() { Text = "لزبین" },
-            new KeyboardButton() { Text = "گی" }
+            new KeyboardButton() { Text = "فضای باز" },
         },
         new KeyboardButton[]
         {
-            new KeyboardButton() { Text = "فضای باز" },
+
             new KeyboardButton() { Text = "عاشقانه" },
-            new KeyboardButton() { Text = "کاسپلی" }
+            new KeyboardButton() { Text = "کاسپلی" },
+            new KeyboardButton() { Text = "میلف" }
         },
         new KeyboardButton[]
         {
             new KeyboardButton() { Text = "هارد کور" },
             new KeyboardButton() { Text = "سافت کور" },
-            new KeyboardButton() { Text = "میلف" }
+            new KeyboardButton() { Text = "بالغانه" },
         },
         new KeyboardButton[]
         {
-            new KeyboardButton() { Text = "بالغانه" },
             new KeyboardButton() { Text = "هنتای" },
-            new KeyboardButton() { Text = "موقعیت" }
+            new KeyboardButton() { Text = "موقعیت" },
+            new KeyboardButton() { Text = "فوت فتیش" },
         },
 
         new KeyboardButton[]
         {
-            new KeyboardButton() { Text = "فوت فتیش" },
             new KeyboardButton() { Text = "Footjob" },
-            new KeyboardButton() { Text = "Handjob" }
-        },
-        new KeyboardButton[]
-        {
+            new KeyboardButton() { Text = "Handjob" },
             new KeyboardButton() { Text = "BDSM" },
         },
     })
@@ -245,10 +275,8 @@ namespace DevilBot
                 ResizeKeyboard = true
             };
 
-            await BotClient.SendMessage(
-                message.Chat.Id,
-                "یک گذینه را انتخاب کنید",
-                replyMarkup: targetButtons);
+            await BotClient.SendMessage(message.Chat.Id, txtMessage ?? "یک گزینه را انتخاب کنید", replyMarkup: targetButtons);
+
         }
 
         private static async Task SendInfo(Message message, UserSession session)
@@ -257,7 +285,7 @@ namespace DevilBot
             {
                 await BotClient.SendMessage(
                     message.Chat.Id,
-                    "ویدیوی دیگری وجود ندارد لطفا از گذینه ای دیگر بهره مند شوید");
+                    "ویدیوی دیگری وجود ندارد لطفا از دسته بندی ی دیگر بهره مند شوید");
                 return;
             }
 
@@ -303,11 +331,14 @@ namespace DevilBot
             return JsonConvert.DeserializeObject<VideoResponse>(res) ?? new();
         }
 
-       private static void ChangeUrl(string query, int count, UserSession session)
+       private static void ChangeUrl(string? query, int count, UserSession session)
         {
+            if (query is null)
+            {
+                session.ApiUrl = null;
+                return;
+            }
             session.ApiUrl = $"https://www.eporner.com/api/v2/video/search/?query={Uri.EscapeDataString(query)}&per_page={count}";
-
-
         }
 
         private static void SelectCategory(string category, int count, UserSession session)
@@ -319,7 +350,6 @@ namespace DevilBot
                 "Solo" => () => ChangeUrl(category.ToLower(), count, session),
                 "Couples" => () => ChangeUrl(category.ToLower(), count, session),
                 "Lesbian" => () => ChangeUrl(category.ToLower(), count, session),
-                "Gay" => () => ChangeUrl(category.ToLower(), count, session),
                 "BDSM" => () => ChangeUrl(category.ToLower(), count, session),
                 "Cosplay" => () => ChangeUrl(category.ToLower(), count, session),
                 "Softcore" => () => ChangeUrl(category.ToLower(), count, session),
@@ -330,10 +360,11 @@ namespace DevilBot
                 "Mature" => () => ChangeUrl(category.ToLower(), count, session),
                 "Hentai" => () => ChangeUrl(category.ToLower(), count, session),
                 "Hardcore" => () => ChangeUrl(category.ToLower(), count, session),
+                "Outdoor" => () => ChangeUrl(category.ToLower(), count, session),
                 "Footjob" => () => ChangeUrl(category.ToLower(), count, session),
                 "Handjob" => () => ChangeUrl(category.ToLower(), count, session),
                 "ایرانی" => () => ChangeUrl(category.ToLower(), count, session),
-                _ => () => ChangeUrl(category.ToLower(), count, session),
+                _ => () => ChangeUrl(null, count, session),
             };
 
             change();

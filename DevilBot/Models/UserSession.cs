@@ -6,11 +6,14 @@ namespace DevilBot.Models
 {
     class UserSession
     {
+        public string? FirstName { get; set; }
+        public string? UserName { get; set; }
+        public long ChatId { get; set; }
         public VideoResponse Response { get; set; } = new();
 
         public int StepNumber { get; set; }
 
-        public string ApiUrl { get; set; } = "";
+        public string? ApiUrl { get; set; } = "";
 
         public CancellationTokenSource Cts { get; set; } = new();
 
