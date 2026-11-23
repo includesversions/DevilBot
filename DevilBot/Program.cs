@@ -15,5 +15,5 @@ Console.WriteLine("Bot Running.");
 
 await bot.SendMessage(6124324134, "دوباره اجرا شدم");
 
-Console.ReadLine();
+await Task.Delay(Timeout.InfiniteTimeSpan);
 
