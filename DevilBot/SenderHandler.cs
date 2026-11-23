@@ -113,6 +113,7 @@ namespace DevilBot
                 else
                 {
                     await BotClient.SendMessage(message.Chat.Id, "کانال باید با @ شروع شود");
+		    addChannel = false;
                 }
             }
             UserSession userInfo;
