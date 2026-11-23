@@ -4,7 +4,7 @@ WORKDIR /src
 
 COPY . .
 
-RUN dotnet publish DevilBot.csproj -c Release -o /app/out
+RUN dotnet publish DevilBot/DevilBot.csproj -c Release -o /app/out
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0
 
